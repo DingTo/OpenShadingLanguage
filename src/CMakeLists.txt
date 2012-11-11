@@ -49,9 +49,9 @@ if (NOT CMAKE_COMPILER_IS_CLANG)
     endif ()
 endif ()
 
-## turn on more detailed warnings and consider warnings as errors
+## turn on more detailed warnings
 if (NOT MSVC)
-    add_definitions ("-Wall -Werror")
+    add_definitions ("-Wall")
 endif ()
 
 ## disable RTTI
