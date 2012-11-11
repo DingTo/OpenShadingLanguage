@@ -9,6 +9,9 @@ set (OSL_LIBRARY_VERSION_PATCH 0)
 set (OSO_FILE_VERSION_MAJOR 1)
 set (OSO_FILE_VERSION_MINOR 0)
 
+set (BUILDSTATIC OFF CACHE BOOL "Build static library instead of shared")
+set (LINKSTATIC OFF CACHE BOOL "Link with static external libraries when possible")
+
 
 cmake_minimum_required (VERSION 2.6)
 if (NOT CMAKE_VERSION VERSION_LESS 2.8.4)
@@ -46,9 +49,9 @@ if (NOT CMAKE_COMPILER_IS_CLANG)
     endif ()
 endif ()
 
-## turn on more detailed warnings and consider warnings as errors
+## turn on more detailed warnings
 if (NOT MSVC)
-    add_definitions ("-Wall -Werror")
+    add_definitions ("-Wall")
 endif ()
 
 ## disable RTTI
@@ -164,10 +167,13 @@ add_subdirectory (liboslquery)
 add_subdirectory (liboslexec)
 
 add_subdirectory (oslc)
-add_subdirectory (shaders)
 add_subdirectory (oslinfo)
-add_subdirectory (testshade)
-add_subdirectory (testrender)
+add_subdirectory (shaders)
+
+if (BUILD_TESTING)
+    add_subdirectory (testshade)
+    add_subdirectory (testrender)
+endif ()
 
 add_subdirectory (include)
 add_subdirectory (doc)
@@ -177,78 +183,80 @@ add_subdirectory (doc)
 #########################################################################
 # Testing
 
-# Make a copy of the testsuite into the build area
-if (DEFINED CMAKE_VERSION AND NOT CMAKE_VERSION VERSION_LESS 2.8)
-    file (COPY ${PROJECT_SOURCE_DIR}/../testsuite
-          DESTINATION ${CMAKE_BINARY_DIR})
-endif()
+if (BUILD_TESTING)
+    # Make a copy of the testsuite into the build area
+    if (DEFINED CMAKE_VERSION AND NOT CMAKE_VERSION VERSION_LESS 2.8)
+        file (COPY ${PROJECT_SOURCE_DIR}/../testsuite
+              DESTINATION ${CMAKE_BINARY_DIR})
+    endif()
 
-macro ( TESTSUITE )
-    parse_arguments (_ats "LABEL" "" ${ARGN})
-    # If there was a FOUNDVAR param specified and that variable name is
-    # not defined, mark the test as broken.
-    if (_ats_FOUNDVAR AND NOT ${_ats_FOUNDVAR})
-        set (_ats_LABEL "broken")
-    endif ()
-    # Add the tests if all is well.
-    foreach (_testname ${_ats_DEFAULT_ARGS})
-        set (_testdir "${CMAKE_BINARY_DIR}/testsuite/${_testname}")
-        if (_ats_LABEL MATCHES "broken")
-            set (_testname "${_testname}-broken")
+    macro ( TESTSUITE )
+        parse_arguments (_ats "LABEL" "" ${ARGN})
+        # If there was a FOUNDVAR param specified and that variable name is
+        # not defined, mark the test as broken.
+        if (_ats_FOUNDVAR AND NOT ${_ats_FOUNDVAR})
+            set (_ats_LABEL "broken")
         endif ()
-        set (_runtest python ${CMAKE_BINARY_DIR}/testsuite/runtest.py
-                             ${_testdir} ${_extra_test_args})
-        if (MSVC_IDE)
-            set (_runtest ${_runtest} --devenv-config $<CONFIGURATION>
-                                      --solution-path "${CMAKE_BINARY_DIR}" )
-        endif ()
+        # Add the tests if all is well.
+        foreach (_testname ${_ats_DEFAULT_ARGS})
+            set (_testdir "${CMAKE_BINARY_DIR}/testsuite/${_testname}")
+            if (_ats_LABEL MATCHES "broken")
+                set (_testname "${_testname}-broken")
+            endif ()
+            set (_runtest python ${CMAKE_BINARY_DIR}/testsuite/runtest.py
+                                 ${_testdir} ${_extra_test_args})
+            if (MSVC_IDE)
+                set (_runtest ${_runtest} --devenv-config $<CONFIGURATION>
+                                          --solution-path "${CMAKE_BINARY_DIR}" )
+            endif ()
 
-        message (STATUS "TEST ${_testname}: ${CMAKE_BINARY_DIR}/testsuite/runtest.py ${_testdir} ${_extra_test_args}")
+            message (STATUS "TEST ${_testname}: ${CMAKE_BINARY_DIR}/testsuite/runtest.py ${_testdir} ${_extra_test_args}")
 
-        # Run the test unoptimized
-        if (NOT _testname MATCHES "^render")
-          set (_env TESTSHADE_OPT=0 OPENIMAGEIOHOME=${OPENIMAGEIOHOME})
-          add_test ( NAME ${_testname}
-                     COMMAND env ${_env} ${_runtest} )
-        endif ()
-        # Run the same test again with aggressive -O2 runtime
-        # optimization, triggered by setting TESTSHADE_OPT env variable
-        set (_env TESTSHADE_OPT=2 OPENIMAGEIOHOME=${OPENIMAGEIOHOME})
-        add_test ( NAME ${_testname}.opt
-                   COMMAND env ${_env} ${_runtest} )
-    endforeach ()
-endmacro ()
+            # Run the test unoptimized
+            if (NOT _testname MATCHES "^render")
+              set (_env TESTSHADE_OPT=0 OPENIMAGEIOHOME=${OPENIMAGEIOHOME})
+              add_test ( NAME ${_testname}
+                         COMMAND env ${_env} ${_runtest} )
+            endif ()
+            # Run the same test again with aggressive -O2 runtime
+            # optimization, triggered by setting TESTSHADE_OPT env variable
+            set (_env TESTSHADE_OPT=2 OPENIMAGEIOHOME=${OPENIMAGEIOHOME})
+            add_test ( NAME ${_testname}.opt
+                       COMMAND env ${_env} ${_runtest} )
+        endforeach ()
+    endmacro ()
 
-# List all the individual testsuite tests here, except those that need
-# special installed tests.
-#TESTSUITE ( oslc-empty )
-TESTSUITE ( arithmetic array array-derivs array-range
-            blackbody blendmath breakcont bug-locallifetime
-            cellnoise closure color comparison
-            component-range const-array-params debugnan
-            derivs derivs-muldiv-clobber error-dupes exponential
-            function-earlyreturn function-simple function-outputelem
-            geomath getsymbol-nonheap gettextureinfo hyperb
-            ieee_fp if incdec initops intbits
-            layers layers-Ciassign layers-lazy
-            logic loop matrix message miscmath missing-shader
-            noise noise-cell
-            noise-gabor noise-gabor2d-filter noise-gabor3d-filter
-            noise-perlin noise-uperlin
-            pnoise pnoise-cell pnoise-gabor pnoise-perlin pnoise-uperlin
-            oslc-err-noreturn oslc-err-paramdefault
-            raytype render-background render-bumptest render-cornell render-furnace-diffuse
-            render-microfacet render-oren-nayar render-veachmis render-ward
-            shortcircuit spline splineinverse string 
-            struct struct-array struct-array-mixture
-            struct-err struct-layers struct-with-array 
-            struct-within-struct ternary
-            texture-alpha texture-blur texture-field3d
-            texture-firstchannel texture-interp texture-simple
-            texture-smallderivs texture-swirl
-            texture-width texture-withderivs texture-wrap
-            transform transformc trig typecast vecctr vector
-            wavelength_color xml )
+    # List all the individual testsuite tests here, except those that need
+    # special installed tests.
+    #TESTSUITE ( oslc-empty )
+    TESTSUITE ( arithmetic array array-derivs array-range
+                blackbody blendmath breakcont bug-locallifetime
+                cellnoise closure color comparison
+                component-range const-array-params debugnan
+                derivs derivs-muldiv-clobber error-dupes exponential
+                function-earlyreturn function-simple function-outputelem
+                geomath getsymbol-nonheap gettextureinfo hyperb
+                ieee_fp if incdec initops intbits
+                layers layers-Ciassign layers-lazy
+                logic loop matrix message miscmath missing-shader
+                noise noise-cell
+                noise-gabor noise-gabor2d-filter noise-gabor3d-filter
+                noise-perlin noise-uperlin
+                pnoise pnoise-cell pnoise-gabor pnoise-perlin pnoise-uperlin
+                oslc-err-noreturn oslc-err-paramdefault
+                raytype render-background render-bumptest render-cornell render-furnace-diffuse
+                render-microfacet render-oren-nayar render-veachmis render-ward
+                shortcircuit spline splineinverse string 
+                struct struct-array struct-array-mixture
+                struct-err struct-layers struct-with-array 
+                struct-within-struct ternary
+                texture-alpha texture-blur texture-field3d
+                texture-firstchannel texture-interp texture-simple
+                texture-smallderivs texture-swirl
+                texture-width texture-withderivs texture-wrap
+                transform transformc trig typecast vecctr vector
+                wavelength_color xml )
+endif ()
 
 
 

@@ -280,15 +280,10 @@ if (LLVM_LIBRARY AND LLVM_INCLUDES AND LLVM_DIRECTORY AND LLVM_LIB_DIR)
     # if static LLVM libraries were requested, use llvm-config to generate
     # the list of what libraries we need, and substitute that in the right
     # way for LLVM_LIBRARY.
-    set (LLVM_LIBRARY "")
-    execute_process (COMMAND ${LLVM_CONFIG} --libs
-                 OUTPUT_VARIABLE llvm_library_list
-	         OUTPUT_STRIP_TRAILING_WHITESPACE)
-    string (REPLACE "-l" "" llvm_library_list ${llvm_library_list})
-    string (REPLACE " " ";" llvm_library_list ${llvm_library_list})
-    foreach (f ${llvm_library_list})
-      list (APPEND LLVM_LIBRARY "${LLVM_LIB_DIR}/lib${f}.a")
-    endforeach ()
+    execute_process (COMMAND ${LLVM_CONFIG} --libfiles
+                     OUTPUT_VARIABLE LLVM_LIBRARY
+   	                 OUTPUT_STRIP_TRAILING_WHITESPACE)
+    string (REPLACE " " ";" LLVM_LIBRARY ${LLVM_LIBRARY})
   endif ()
   message (STATUS "LLVM library  = ${LLVM_LIBRARY}")
 else ()
